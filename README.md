@@ -34,6 +34,13 @@ func main() {
     // Read messages
     for _, mail := range mails {
         fmt.Printf("Received mail from %s with subject %s on %s\n", mail.From, mail.Subject, mail.Date)
+        if mail.Subject == "subject I'm insterested in" {
+            m, err := mailbox.ReadMessage(mail.ID)
+            if err != nil {
+                // handle err
+            }
+            fmt.Printf("Mail body is %s and contains %d attachments\n", m.Body, len(m.Attachments))
+        }
     }
 }
 ```
