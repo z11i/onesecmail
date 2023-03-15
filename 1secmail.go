@@ -93,6 +93,23 @@ func (a API) Domains() ([]string, error) {
 	return list, nil
 }
 
+// UpdateDomains updates the list of domains that 1secmail supports.
+// This is useful if the list of domains have changed since this library was last updated.
+func (a API) UpdateDomains() error {
+	domains := make(map[string]struct{})
+	liveDomains, err := a.Domains()
+	if err != nil {
+		return err
+	}
+	for _, domain := range liveDomains {
+		domains[domain] = struct{}{}
+	}
+	domainsMu.Lock()
+	defer domainsMu.Unlock()
+	Domains = domains
+	return nil
+}
+
 // Mailbox manages communication with the 1secmail's APIs that belong to a specific mailbox.
 type Mailbox struct {
 	Login  string

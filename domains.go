@@ -1,5 +1,7 @@
 package onesecmail
 
+import "sync"
+
 var Domains = map[string]struct{}{
 	"1secmail.com": {},
 	"1secmail.org": {},
@@ -10,3 +12,5 @@ var Domains = map[string]struct{}{
 	"qiott.com":    {},
 	"wuuvo.com":    {},
 }
+
+var domainsMu sync.Mutex
