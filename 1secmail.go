@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 const apiBase = "https://www.1secmail.com/api/v1/"
@@ -70,6 +71,18 @@ func NewMailbox(login, domain string, httpClient HTTPClient) *Mailbox {
 		Domain:  domain,
 		Login:   login,
 	}
+}
+
+// NewMailboxWithAddress returns a new Mailbox. It accepts an email address
+// that refers to a 1secmail mailbox. This is easier to use than NewMailbox
+// if you already have an email address. If nil httpClient is provided, a
+// new http.Client will be created.
+func NewMailboxWithAddress(address string, httpClient HTTPClient) (*Mailbox, error) {
+	login, domain, ok := strings.Cut(address, "@")
+	if !ok || login == "" || domain == "" {
+		return nil, fmt.Errorf("invalid email address: %s", address)
+	}
+	return NewMailbox(login, domain, httpClient), nil
 }
 
 // CheckInbox checks the inbox of a mailbox, and returns a list of mails.

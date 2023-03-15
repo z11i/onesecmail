@@ -19,6 +19,28 @@ func (c *ClientMock) Do(req *http.Request) (*http.Response, error) {
 	return c.DoFunc(req)
 }
 
+func Test_NewMailboxWithAddress(t *testing.T) {
+	tests := []struct {
+		name    string
+		address string
+		expErr  bool
+	}{
+		{name: "valid address", address: "foo@bar.com"},
+		{name: "invalid address", address: "foobar.com", expErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mailbox, err := onesecmail.NewMailboxWithAddress(test.address, nil)
+			if (err == nil) != !test.expErr {
+				t.Fatal("should not error")
+			}
+			if !test.expErr && mailbox == nil {
+				t.Fatal("mailbox should not be nil")
+			}
+		})
+	}
+}
+
 func Test_CheckInbox(t *testing.T) {
 	tests := []struct {
 		name     string
