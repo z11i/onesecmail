@@ -225,11 +225,50 @@ func Test_RandomAddresses(t *testing.T) {
 					return &http.Response{StatusCode: code, Body: r}, err
 				},
 			}
-			mailbox, err := onesecmail.NewMailbox("foo", "1secmail.org", client)
-			if err != nil {
+			mailbox := onesecmail.NewAPI(client)
+			addresses, err := mailbox.RandomAddresses(2)
+			if (err == nil) != !test.expErr {
 				t.Fatal("should not error")
 			}
-			addresses, err := mailbox.RandomAddresses(2)
+			if len(addresses) != test.expCount {
+				t.Fatal("len not expected")
+			}
+		})
+	}
+}
+
+func Test_Domains(t *testing.T) {
+	tests := []struct {
+		name     string
+		respBody string
+		respCode int
+		respErr  string
+		expErr   bool
+		expCount int
+	}{
+		{name: "success", respBody: `["1secmail.org","1secmail.com"]`, expCount: 2},
+		{name: "500", respCode: 500, expErr: true},
+		{name: "error response", respErr: "error", expErr: true},
+		{name: "decode issue", respBody: `[`, expErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := ioutil.NopCloser(bytes.NewReader([]byte(test.respBody)))
+			client := &ClientMock{
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					var err error = nil
+					if test.respErr != "" {
+						err = errors.New(test.respErr)
+					}
+					code := test.respCode
+					if code == 0 {
+						code = 200
+					}
+					return &http.Response{StatusCode: code, Body: r}, err
+				},
+			}
+			mailbox := onesecmail.NewAPI(client)
+			addresses, err := mailbox.Domains()
 			if (err == nil) != !test.expErr {
 				t.Fatal("should not error")
 			}

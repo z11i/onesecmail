@@ -15,11 +15,12 @@ const (
 	readMessage
 	download
 	genRandomMailbox
+	getDomainList
 )
 
 func (m mailboxAction) String() string {
 	return [...]string{
-		"getMessages", "readMessage", "download", "genRandomMailbox",
+		"getMessages", "readMessage", "download", "genRandomMailbox", "getDomainList",
 	}[m]
 }
 
@@ -67,6 +68,21 @@ func (a API) RandomAddresses(count int) ([]string, error) {
 	resp, err := a.client.Do(req)
 	if err != nil || (resp != nil && resp.StatusCode != 200) {
 		return nil, fmt.Errorf("generate random mailbox failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var list []string
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, fmt.Errorf("decode JSON failed: %w", err)
+	}
+	return list, nil
+}
+
+func (a API) Domains() ([]string, error) {
+	req := a.constructRequest("GET", getDomainList, nil)
+	resp, err := a.client.Do(req)
+	if err != nil || (resp != nil && resp.StatusCode != 200) {
+		return nil, fmt.Errorf("get domain list failed: %w", err)
 	}
 	defer resp.Body.Close()
 
