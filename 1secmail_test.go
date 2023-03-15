@@ -19,13 +19,35 @@ func (c *ClientMock) Do(req *http.Request) (*http.Response, error) {
 	return c.DoFunc(req)
 }
 
+func Test_NewMailbox(t *testing.T) {
+	tests := []struct {
+		name   string
+		domain string
+		expErr bool
+	}{
+		{name: "valid domain", domain: "1secmail.com"},
+		{name: "invalid domain", domain: "foobar.com", expErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mailbox, err := onesecmail.NewMailbox("", test.domain, nil)
+			if (err == nil) != !test.expErr {
+				t.Fatal("should not error")
+			}
+			if !test.expErr && mailbox == nil {
+				t.Fatal("mailbox should not be nil")
+			}
+		})
+	}
+}
+
 func Test_NewMailboxWithAddress(t *testing.T) {
 	tests := []struct {
 		name    string
 		address string
 		expErr  bool
 	}{
-		{name: "valid address", address: "foo@bar.com"},
+		{name: "valid address", address: "foo@1secmail.com"},
 		{name: "invalid address", address: "foobar.com", expErr: true},
 	}
 	for _, test := range tests {
@@ -92,7 +114,10 @@ func Test_CheckInbox(t *testing.T) {
 					}, err
 				},
 			}
-			mailbox := onesecmail.NewMailbox("foo", "bar", client)
+			mailbox, err := onesecmail.NewMailbox("foo", "1secmail.org", client)
+			if err != nil {
+				t.Fatal("should not error")
+			}
 			gotMails, err := mailbox.CheckInbox()
 			if (err == nil) != (test.expErr == "") {
 				t.Fatal("should not error")
@@ -152,8 +177,11 @@ func Test_ReadMessage(t *testing.T) {
 					return &http.Response{StatusCode: code, Body: r}, err
 				},
 			}
-			mailbox := onesecmail.NewMailbox("foo", "bar", client)
-			_, err := mailbox.ReadMessage(1)
+			mailbox, err := onesecmail.NewMailbox("foo", "1secmail.org", client)
+			if err != nil {
+				t.Fatal("should not error")
+			}
+			_, err = mailbox.ReadMessage(1)
 			if (err == nil) != (test.expErr == "") {
 				t.Fatal("should not error")
 			}

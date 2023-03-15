@@ -61,7 +61,10 @@ func (m Mailbox) Address() string {
 // NewMailbox returns a new Mailbox. Use login and domain for the email
 // handler that you intend to use. Login is the email username.
 // If nil httpClient is provided, a new http.Client will be created.
-func NewMailbox(login, domain string, httpClient HTTPClient) *Mailbox {
+func NewMailbox(login, domain string, httpClient HTTPClient) (*Mailbox, error) {
+	if _, ok := Domains[domain]; !ok {
+		return nil, fmt.Errorf("invalid domain: %s", domain)
+	}
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
@@ -70,7 +73,7 @@ func NewMailbox(login, domain string, httpClient HTTPClient) *Mailbox {
 		client:  httpClient,
 		Domain:  domain,
 		Login:   login,
-	}
+	}, nil
 }
 
 // NewMailboxWithAddress returns a new Mailbox. It accepts an email address
@@ -82,7 +85,7 @@ func NewMailboxWithAddress(address string, httpClient HTTPClient) (*Mailbox, err
 	if !ok || login == "" || domain == "" {
 		return nil, fmt.Errorf("invalid email address: %s", address)
 	}
-	return NewMailbox(login, domain, httpClient), nil
+	return NewMailbox(login, domain, httpClient)
 }
 
 // CheckInbox checks the inbox of a mailbox, and returns a list of mails.
