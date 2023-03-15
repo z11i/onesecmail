@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -15,10 +16,13 @@ const (
 	getMessages mailboxAction = iota
 	readMessage
 	download
+	genRandomMailbox
 )
 
 func (m mailboxAction) String() string {
-	return [...]string{"getMessages", "readMessage", "download"}[m]
+	return [...]string{
+		"getMessages", "readMessage", "download", "genRandomMailbox",
+	}[m]
 }
 
 // Mail represents a mail in a 1secmail inbox.
@@ -61,14 +65,14 @@ func (m Mailbox) Address() string {
 // NewMailbox returns a new Mailbox. Use login and domain for the email
 // handler that you intend to use. Login is the email username.
 // If nil httpClient is provided, a new http.Client will be created.
-func NewMailbox(login, domain string, httpClient HTTPClient) (*Mailbox, error) {
+func NewMailbox(login, domain string, httpClient HTTPClient) (Mailbox, error) {
 	if _, ok := Domains[domain]; !ok {
-		return nil, fmt.Errorf("invalid domain: %s", domain)
+		return Mailbox{}, fmt.Errorf("invalid domain: %s", domain)
 	}
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
-	return &Mailbox{
+	return Mailbox{
 		BaseURL: apiBase,
 		client:  httpClient,
 		Domain:  domain,
@@ -80,10 +84,10 @@ func NewMailbox(login, domain string, httpClient HTTPClient) (*Mailbox, error) {
 // that refers to a 1secmail mailbox. This is easier to use than NewMailbox
 // if you already have an email address. If nil httpClient is provided, a
 // new http.Client will be created.
-func NewMailboxWithAddress(address string, httpClient HTTPClient) (*Mailbox, error) {
+func NewMailboxWithAddress(address string, httpClient HTTPClient) (Mailbox, error) {
 	login, domain, ok := strings.Cut(address, "@")
 	if !ok || login == "" || domain == "" {
-		return nil, fmt.Errorf("invalid email address: %s", address)
+		return Mailbox{}, fmt.Errorf("invalid email address: %s", address)
 	}
 	return NewMailbox(login, domain, httpClient)
 }
@@ -112,7 +116,7 @@ func (m Mailbox) ReadMessage(messageID int) (*Mail, error) {
 	req := constructRequest("GET", m.BaseURL, readMessage, map[string]string{
 		"login":  m.Login,
 		"domain": m.Domain,
-		"id":     fmt.Sprint(messageID),
+		"id":     strconv.Itoa(messageID),
 	})
 	resp, err := m.client.Do(req)
 	if err != nil || (resp != nil && resp.StatusCode != 200) {
@@ -126,6 +130,23 @@ func (m Mailbox) ReadMessage(messageID int) (*Mail, error) {
 	}
 
 	return mail, nil
+}
+
+func (m Mailbox) RandomAddresses(count int) ([]string, error) {
+	req := constructRequest("GET", m.BaseURL, genRandomMailbox, map[string]string{
+		"count": strconv.Itoa(count),
+	})
+	resp, err := m.client.Do(req)
+	if err != nil || (resp != nil && resp.StatusCode != 200) {
+		return nil, fmt.Errorf("generate random mailbox failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var list []string
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, fmt.Errorf("decode JSON failed: %w", err)
+	}
+	return list, nil
 }
 
 func constructRequest(method, baseURL string, action mailboxAction, args map[string]string) *http.Request {
