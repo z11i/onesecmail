@@ -3,6 +3,7 @@ package onesecmail
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -186,6 +187,26 @@ func (m Mailbox) ReadMessage(messageID int) (*Mail, error) {
 	}
 
 	return mail, nil
+}
+
+func (m Mailbox) DownloadAttachment(messageID int, filename string) ([]byte, error) {
+	req := m.constructRequest("GET", download, map[string]string{
+		"login":  m.Login,
+		"domain": m.Domain,
+		"id":     strconv.Itoa(messageID),
+		"file":   filename,
+	})
+	resp, err := m.client.Do(req)
+	if err != nil || (resp != nil && resp.StatusCode != 200) {
+		return nil, fmt.Errorf("download attachment failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body failed: %w", err)
+	}
+	return data, nil
 }
 
 func (a API) constructRequest(method string, action mailboxAction, args map[string]string) *http.Request {
