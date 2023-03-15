@@ -99,13 +99,13 @@ func (m Mailbox) ReadMessage(messageID int) (*Mail, error) {
 		"id":     fmt.Sprint(messageID),
 	})
 	resp, err := m.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("read messsage failed: %w", err)
+	if err != nil || (resp != nil && resp.StatusCode != 200) {
+		return nil, fmt.Errorf("read message failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var mail *Mail
-	if err := json.NewDecoder(resp.Body).Decode(mail); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&mail); err != nil {
 		return nil, fmt.Errorf("decode JSON failed: %w", err)
 	}
 

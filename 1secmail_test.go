@@ -84,3 +84,61 @@ func Test_CheckInbox(t *testing.T) {
 		})
 	}
 }
+
+func Test_ReadMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		respBody string
+		respCode int
+		respErr  string
+		expErr   string
+	}{
+		{
+			name:     "valid response",
+			respBody: `{"id":639,"from":"email","subject":"subject","date":"2018-06-08 14:33:55","text":"text","html":"html"}`,
+			respErr:  "",
+		}, {
+			name:     "error response",
+			respBody: `{"id":639,"from":"email","subject":"subject","date":"2018-06-08 14:33:55","text":"text","html":"html"}`,
+			respCode: 500,
+			expErr:   "read message failed",
+		}, {
+			name:     "unknown http error",
+			respBody: `{"id":639,"from":"email","subject":"subject","date":"2018-06-08 14:33:55","text":"text","html":"html"}`,
+			respErr:  "unknown error",
+			expErr:   "unknown error",
+		}, {
+			name:     "json decode error",
+			respBody: `{"id":639,"from":"`,
+			expErr:   "decode JSON failed",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := ioutil.NopCloser(bytes.NewReader([]byte(test.respBody)))
+			client := &ClientMock{
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					var err error = nil
+					if test.respErr != "" {
+						err = errors.New(test.respErr)
+					}
+					code := test.respCode
+					if code == 0 {
+						code = 200
+					}
+					return &http.Response{StatusCode: code, Body: r}, err
+				},
+			}
+			mailbox := onesecmail.NewMailbox("foo", "bar", client)
+			_, err := mailbox.ReadMessage(1)
+			if (err == nil) != (test.expErr == "") {
+				t.Fatal("should not error")
+			}
+			if err != nil && !strings.Contains(err.Error(), test.expErr) {
+				t.Fatalf("error expected: %s, got: %s", test.expErr, err.Error())
+			}
+		})
+	}
+
+}
