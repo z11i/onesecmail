@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-const apiBase = "https://www.1secmail.com/api/v1/"
-
 type mailboxAction int
 
 const (
@@ -49,12 +47,41 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Mailbox manages communication with 1secmail's API.
+// API manages communication with the 1secmail's APIs that do not belong to a specific mailbox.
+type API struct {
+	client HTTPClient
+}
+
+// NewAPI returns a new API. If nil httpClient is provided, a new http.Client will be created.
+func NewAPI(httpClient HTTPClient) API {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	return API{client: httpClient}
+}
+
+func (a API) RandomAddresses(count int) ([]string, error) {
+	req := a.constructRequest("GET", genRandomMailbox, map[string]string{
+		"count": strconv.Itoa(count),
+	})
+	resp, err := a.client.Do(req)
+	if err != nil || (resp != nil && resp.StatusCode != 200) {
+		return nil, fmt.Errorf("generate random mailbox failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var list []string
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, fmt.Errorf("decode JSON failed: %w", err)
+	}
+	return list, nil
+}
+
+// Mailbox manages communication with the 1secmail's APIs that belong to a specific mailbox.
 type Mailbox struct {
-	Login   string
-	Domain  string
-	BaseURL string // Base URL for API requests, with trailing slash.
-	client  HTTPClient
+	Login  string
+	Domain string
+	API
 }
 
 // Address returns the email address of a Mailbox.
@@ -69,14 +96,10 @@ func NewMailbox(login, domain string, httpClient HTTPClient) (Mailbox, error) {
 	if _, ok := Domains[domain]; !ok {
 		return Mailbox{}, fmt.Errorf("invalid domain: %s", domain)
 	}
-	if httpClient == nil {
-		httpClient = &http.Client{}
-	}
 	return Mailbox{
-		BaseURL: apiBase,
-		client:  httpClient,
-		Domain:  domain,
-		Login:   login,
+		API:    NewAPI(httpClient),
+		Domain: domain,
+		Login:  login,
 	}, nil
 }
 
@@ -94,7 +117,7 @@ func NewMailboxWithAddress(address string, httpClient HTTPClient) (Mailbox, erro
 
 // CheckInbox checks the inbox of a mailbox, and returns a list of mails.
 func (m Mailbox) CheckInbox() ([]*Mail, error) {
-	req := constructRequest("GET", m.BaseURL, getMessages, map[string]string{
+	req := m.constructRequest("GET", getMessages, map[string]string{
 		"login":  m.Login,
 		"domain": m.Domain,
 	})
@@ -113,7 +136,7 @@ func (m Mailbox) CheckInbox() ([]*Mail, error) {
 
 // ReadMessage retrieves a particular mail from the inbox of a mailbox.
 func (m Mailbox) ReadMessage(messageID int) (*Mail, error) {
-	req := constructRequest("GET", m.BaseURL, readMessage, map[string]string{
+	req := m.constructRequest("GET", readMessage, map[string]string{
 		"login":  m.Login,
 		"domain": m.Domain,
 		"id":     strconv.Itoa(messageID),
@@ -132,25 +155,10 @@ func (m Mailbox) ReadMessage(messageID int) (*Mail, error) {
 	return mail, nil
 }
 
-func (m Mailbox) RandomAddresses(count int) ([]string, error) {
-	req := constructRequest("GET", m.BaseURL, genRandomMailbox, map[string]string{
-		"count": strconv.Itoa(count),
-	})
-	resp, err := m.client.Do(req)
-	if err != nil || (resp != nil && resp.StatusCode != 200) {
-		return nil, fmt.Errorf("generate random mailbox failed: %w", err)
-	}
-	defer resp.Body.Close()
+func (a API) constructRequest(method string, action mailboxAction, args map[string]string) *http.Request {
+	const apiBase = "https://www.1secmail.com/api/v1/"
 
-	var list []string
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		return nil, fmt.Errorf("decode JSON failed: %w", err)
-	}
-	return list, nil
-}
-
-func constructRequest(method, baseURL string, action mailboxAction, args map[string]string) *http.Request {
-	req, _ := http.NewRequest(method, baseURL, nil)
+	req, _ := http.NewRequest(method, apiBase, nil)
 	query := req.URL.Query()
 	query.Add("action", fmt.Sprint(action))
 	for k, v := range args {
